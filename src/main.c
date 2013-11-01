@@ -60,7 +60,7 @@ static void gpio_init(void)
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IN;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_DOWN;
+    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
     GPIO_Init(DAQ_PORT, &GPIO_InitStructure);
 }
 
@@ -103,9 +103,11 @@ int main(void)
         sample_count = 2000;
 
         while (sample_count > 0) {
+            *DWT_CYCCNT = 0;
             start = *DWT_CYCCNT;
             data_byte = ((uint8_t)DAQ_PORT->IDR) << 4;
-            timing_delay(144 - (*DWT_CYCCNT - start) - 1);
+            current = *DWT_CYCCNT;
+            timing_delay(144 - (current - start) - 1);
             data_byte |= ((uint8_t)DAQ_PORT->IDR) & 0x0F;
 
             daq_buffer[daq_i] = data_byte;
@@ -114,7 +116,9 @@ int main(void)
                 daq_i = 0;
 
             sample_count--;
-            timing_delay(288 - (*DWT_CYCCNT - start) - 1);
+            current = *DWT_CYCCNT;
+            timing_delay(2);
+            /*timing_delay(288 - (current - start) - 1);*/
         }
 
         /* Just finished acquisition. */

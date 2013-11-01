@@ -1,0 +1,10 @@
+*.elf
+*.hex
+*.map
+build
+tags
+.dep
+*.lss
+*.sym
+*.swp
+*.DS_Store
