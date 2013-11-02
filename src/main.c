@@ -95,7 +95,7 @@ static void TIM2_Config(void)
     /* Time base configuration */
     TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
     TIM_TimeBaseStructure.TIM_Prescaler = 1;
-    TIM_TimeBaseStructure.TIM_Period = 144;
+    TIM_TimeBaseStructure.TIM_Period = 83;
     TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up; 
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
@@ -156,7 +156,7 @@ int main(void)
 
     while (1) {
         while(!check_usb());
-        sample_count = 1999;
+        sample_count = 3999;
         TIM2_Enable();
         while (sample_count > 0);
         TIM2_Disable();
