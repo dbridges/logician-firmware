@@ -16,10 +16,16 @@
 __ALIGN_BEGIN USB_OTG_CORE_HANDLE  USB_OTG_dev __ALIGN_END;
 
 #define DAQ_PORT            GPIOD
-#define DAQ_BUFFER_LEN      2000 
+#define DAQ_BUFFER_LEN      10000 
+#define DAQ_TRIGGER_OFFSET  20          // Number of samples before 
+                                        // trigger to keep
+
+typedef enum {
+    TRIGGER_RISING,
+    TRIGGER_FALLING
+} trigger_t;
 
 extern uint8_t protocol_rx_buffer[64];
-
 
 volatile unsigned int *DWT_CYCCNT  = (volatile unsigned int *)0xE0001004;
 volatile unsigned int *DWT_CONTROL = (volatile unsigned int *)0xE0001000;
@@ -29,7 +35,12 @@ volatile uint32_t sample_count;
 volatile uint8_t aq_byte;
 volatile uint8_t aq_flag = 1;
 volatile uint32_t daq_i = 0;
+volatile uint32_t start_i = 0;
 volatile uint8_t daq_buffer[DAQ_BUFFER_LEN];
+volatile uint8_t triggered = FALSE;
+volatile uint8_t trigger_type;
+volatile uint8_t trigger_channel;
+volatile uint8_t prev_sample;
 
 void enable_timing(void)
 {
@@ -118,21 +129,64 @@ void TIM2_Disable(void)
 
 void TIM2_IRQHandler(void)
 {
-    if (sample_count > 0) {
+    if (triggered) {
+        if (sample_count > 0) {
+            if (aq_flag) {
+                aq_byte = ((uint8_t)DAQ_PORT->IDR) << 4;
+            } else {
+                aq_byte |= ((uint8_t)DAQ_PORT->IDR) & 0x0F;
+                daq_buffer[daq_i] = aq_byte;
+                daq_i++;
+                if (daq_i > DAQ_BUFFER_LEN)
+                    daq_i = 0;
+            }
+            aq_flag = !aq_flag;
+            sample_count--;
+        }
+    } else {
+        uint8_t sample;
+        sample = ((uint8_t)DAQ_PORT->IDR);
         if (aq_flag) {
-            aq_byte = ((uint8_t)DAQ_PORT->IDR) << 4;
+            aq_byte = sample << 4;
         } else {
-            aq_byte |= ((uint8_t)DAQ_PORT->IDR) & 0x0F;
+            aq_byte |= sample & 0x0F;
             daq_buffer[daq_i] = aq_byte;
             daq_i++;
+            if (daq_i > DAQ_BUFFER_LEN)
+                daq_i = 0;
         }
         aq_flag = !aq_flag;
-        sample_count--;
+        switch (trigger_type) {
+            case TRIGGER_RISING:
+                if (((prev_sample >> trigger_channel) & 0x01) == 0 &&
+                        ((sample >> trigger_channel) & 0x01) == 1)
+                    triggered = TRUE;
+                break;
+            case TRIGGER_FALLING:
+                if (((prev_sample >> trigger_channel) & 0x01) == 1 &&
+                        ((sample >> trigger_channel) & 0x01) == 0)
+                    triggered = TRUE;
+                break;
+        }
+        prev_sample = sample;
+        if (triggered) {
+            if (daq_i > DAQ_TRIGGER_OFFSET)
+                start_i = daq_i - DAQ_TRIGGER_OFFSET;
+            else {
+                start_i = DAQ_BUFFER_LEN - (DAQ_TRIGGER_OFFSET - daq_i);
+            }
+        }
     }
     TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 }
 
-uint8_t check_usb()
+void reset(void)
+{
+    daq_i = 0;
+    triggered = FALSE;
+}
+
+uint8_t check_usb(void)
 {
     if (VCP_data_available() >= 64) {
         VCP_get_buffer(protocol_rx_buffer, 64);
@@ -149,20 +203,32 @@ int main(void)
     session_param_t *params;
 
     gpio_init();
+    LED_Init();
     usb_cdc_init();
     VCP_flush_rx();
     enable_timing();
     TIM2_Config();
+    reset();
 
     while (1) {
         while(!check_usb());
-        sample_count = 3999;
+        params = Protocol_SessionParams();
+        sample_count = params->sample_count - (DAQ_TRIGGER_OFFSET / 2);
+        trigger_type = params->trigger_type;
+        trigger_channel = params->trigger_channel;
+        prev_sample = ((uint8_t)DAQ_PORT->IDR) & 0x0F;
         TIM2_Enable();
         while (sample_count > 0);
         TIM2_Disable();
-        VCP_send_buffer(daq_buffer, daq_i);
-        /*VCP_send_buffer(&daq_buffer[daq_i], DAQ_BUFFER_LEN - daq_i);*/
-        daq_i = 0;
+        if ((DAQ_BUFFER_LEN - start_i) > params->sample_count / 2) {
+            VCP_send_buffer(&daq_buffer[start_i], daq_i - start_i);
+        } else {
+            LED_Set(LED_RED);
+            VCP_send_buffer(&daq_buffer[start_i], DAQ_BUFFER_LEN - start_i);
+            VCP_send_buffer(daq_buffer, (params->sample_count / 2) - 
+                    (DAQ_BUFFER_LEN - start_i));
+        }
+        reset();
     }
 
     return 0;

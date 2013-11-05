@@ -15,7 +15,11 @@ uint8_t    Protocol_ProcessNewPacket(void)
         case COMMAND_ACQUIRE:
             session_params.sample_period = (*(uint16_t*)ptr);
             ptr += 2;
-            session_params.sample_count = (*(uint32_t*)ptr);
+            session_params.sample_count = (*(uint16_t*)ptr);
+            ptr += 2;
+            session_params.trigger_type = (*(uint8_t*)ptr);
+            ptr += 1;
+            session_params.trigger_channel = (*(uint8_t*)ptr);
             break;
         default:
             return 0;
