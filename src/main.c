@@ -42,29 +42,6 @@ volatile uint8_t trigger_type;
 volatile uint8_t trigger_channel;
 volatile uint8_t prev_sample;
 
-void enable_timing(void)
-{
-    static int enabled = 0;
- 
-    if (!enabled)
-    {
-        *SCB_DEMCR = *SCB_DEMCR | 0x01000000;
-        *DWT_CYCCNT = 0; // reset the counter
-        *DWT_CONTROL = *DWT_CONTROL | 1 ; // enable the counter
- 
-        enabled = 1;
-    }
-}
-
-void timing_delay(unsigned int tick)
-{
-    unsigned int start, current;
-
-    start = *DWT_CYCCNT;
-    do {
-        current = *DWT_CYCCNT;
-    } while((current - start) < tick);
-}
 
 static void gpio_init(void)
 {
@@ -126,6 +103,7 @@ void TIM2_Disable(void)
     TIM_ITConfig(TIM2, TIM_IT_Update, DISABLE);
     TIM_Cmd(TIM2, DISABLE);
 }
+
 
 void TIM2_IRQHandler(void)
 {
@@ -190,7 +168,7 @@ void TIM2_IRQHandler(void)
     TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 }
 
-void reset(void)
+void reset_acquistion(void)
 {
     daq_i = 0;
     triggered = FALSE;
@@ -216,9 +194,8 @@ int main(void)
     LED_Init();
     usb_cdc_init();
     VCP_flush_rx();
-    enable_timing();
     TIM2_Config();
-    reset();
+    reset_acquistion();
 
     while (1) {
         while(!check_usb());  // Wait for usb command.
@@ -239,10 +216,10 @@ int main(void)
                     VCP_send_buffer((uint8_t *)daq_buffer, (params->sample_count / 2) - 
                             (DAQ_BUFFER_LEN - start_i));
                 }
-                reset();
+                reset_acquistion();
                 break;
             case COMMAND_INFO:
-                VCP_send_str("Version 0.1a");
+                VCP_send_str("Version 0.1a\n");
         }
     }
 
