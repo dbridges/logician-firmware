@@ -221,11 +221,11 @@ int main(void)
         while (sample_count > 0);
         TIM2_Disable();
         if ((DAQ_BUFFER_LEN - start_i) > params->sample_count / 2) {
-            VCP_send_buffer(&daq_buffer[start_i], daq_i - start_i);
+            VCP_send_buffer((uint8_t *)&daq_buffer[start_i], daq_i - start_i);
         } else {
             LED_Set(LED_RED);
-            VCP_send_buffer(&daq_buffer[start_i], DAQ_BUFFER_LEN - start_i);
-            VCP_send_buffer(daq_buffer, (params->sample_count / 2) - 
+            VCP_send_buffer((uint8_t *)&daq_buffer[start_i], DAQ_BUFFER_LEN - start_i);
+            VCP_send_buffer((uint8_t *)daq_buffer, (params->sample_count / 2) - 
                     (DAQ_BUFFER_LEN - start_i));
         }
         reset();
