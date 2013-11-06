@@ -560,10 +560,12 @@ static uint8_t  usbd_cdc_Setup (void  *pdev,
 #endif 
         len = MIN(USB_CDC_DESC_SIZ , req->wLength);
       }
-      
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized" 
       USBD_CtlSendData (pdev, 
                         pbuf,
                         len);
+#pragma GCC diagnostic pop
       break;
       
     case USB_REQ_GET_INTERFACE :

@@ -89,6 +89,8 @@ static uint8_t USBD_IsoOUTIncomplete(USB_OTG_CORE_HANDLE  *pdev);
 
 
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers" 
 USBD_DCD_INT_cb_TypeDef USBD_DCD_INT_cb = 
 {
   USBD_DataOutStage,
@@ -105,6 +107,7 @@ USBD_DevConnected,
 USBD_DevDisconnected,    
 #endif  
 };
+#pragma GCC diagnostic pop
 
 USBD_DCD_INT_cb_TypeDef  *USBD_DCD_INT_fops = &USBD_DCD_INT_cb;
 /**
