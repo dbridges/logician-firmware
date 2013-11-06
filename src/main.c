@@ -93,7 +93,7 @@ static void TIM2_Config(void)
     TIM_TimeBaseInitTypeDef    TIM_TimeBaseStructure;
     NVIC_InitTypeDef NVIC_InitStructure;
 
-    /* TIM2 Periph clock enable */
+    // TIM2 Periph clock enable
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
 
@@ -103,7 +103,7 @@ static void TIM2_Config(void)
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 
-    /* Time base configuration */
+    // Time base configuration
     TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
     TIM_TimeBaseStructure.TIM_Prescaler = 1;
     TIM_TimeBaseStructure.TIM_Period = 83;
@@ -111,7 +111,7 @@ static void TIM2_Config(void)
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up; 
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
-    /* TIM2 TRGO selection */
+    // TIM2 TRGO selection
     TIM_SelectOutputTrigger(TIM2, TIM_TRGOSource_Update);
 }
 
@@ -130,7 +130,11 @@ void TIM2_Disable(void)
 void TIM2_IRQHandler(void)
 {
     if (triggered) {
+        // Acquisiton has already been triggered, just sample and save.
         if (sample_count > 0) {
+            // Each sample is 4 bits so we alternate storage between the 4 MSBs
+            // and 4 LSBs. We then save the 2 data samples as a single byte to
+            // an array.
             if (aq_flag) {
                 aq_byte = ((uint8_t)DAQ_PORT->IDR) << 4;
             } else {
@@ -144,6 +148,8 @@ void TIM2_IRQHandler(void)
             sample_count--;
         }
     } else {
+        // Still waiting for acquisition to be triggered, look for correct
+        // change in signal at trigger channel.
         uint8_t sample;
         sample = ((uint8_t)DAQ_PORT->IDR);
         if (aq_flag) {
@@ -158,11 +164,13 @@ void TIM2_IRQHandler(void)
         aq_flag = !aq_flag;
         switch (trigger_type) {
             case TRIGGER_RISING:
+                // Look for 0 -> 1 transition.
                 if (((prev_sample >> trigger_channel) & 0x01) == 0 &&
                         ((sample >> trigger_channel) & 0x01) == 1)
                     triggered = TRUE;
                 break;
             case TRIGGER_FALLING:
+                // Look for 1 -> 0 transition.
                 if (((prev_sample >> trigger_channel) & 0x01) == 1 &&
                         ((sample >> trigger_channel) & 0x01) == 0)
                     triggered = TRUE;
@@ -170,6 +178,8 @@ void TIM2_IRQHandler(void)
         }
         prev_sample = sample;
         if (triggered) {
+            // Trigger was just satisified, store the index to the array where
+            // it occurred for use later when transfering data.
             if (daq_i > DAQ_TRIGGER_OFFSET)
                 start_i = daq_i - DAQ_TRIGGER_OFFSET;
             else {
@@ -211,24 +221,29 @@ int main(void)
     reset();
 
     while (1) {
-        while(!check_usb());
+        while(!check_usb());  // Wait for usb command.
         params = Protocol_SessionParams();
-        sample_count = params->sample_count - (DAQ_TRIGGER_OFFSET / 2);
-        trigger_type = params->trigger_type;
-        trigger_channel = params->trigger_channel;
-        prev_sample = ((uint8_t)DAQ_PORT->IDR) & 0x0F;
-        TIM2_Enable();
-        while (sample_count > 0);
-        TIM2_Disable();
-        if ((DAQ_BUFFER_LEN - start_i) > params->sample_count / 2) {
-            VCP_send_buffer((uint8_t *)&daq_buffer[start_i], daq_i - start_i);
-        } else {
-            LED_Set(LED_RED);
-            VCP_send_buffer((uint8_t *)&daq_buffer[start_i], DAQ_BUFFER_LEN - start_i);
-            VCP_send_buffer((uint8_t *)daq_buffer, (params->sample_count / 2) - 
-                    (DAQ_BUFFER_LEN - start_i));
+        switch (params->command) {
+            case COMMAND_ACQUIRE:
+                sample_count = params->sample_count - (DAQ_TRIGGER_OFFSET / 2);
+                trigger_type = params->trigger_type;
+                trigger_channel = params->trigger_channel;
+                prev_sample = ((uint8_t)DAQ_PORT->IDR) & 0x0F;
+                TIM2_Enable();
+                while (sample_count > 0);
+                TIM2_Disable();
+                if ((DAQ_BUFFER_LEN - start_i) > params->sample_count / 2) {
+                    VCP_send_buffer((uint8_t *)&daq_buffer[start_i], daq_i - start_i);
+                } else {
+                    VCP_send_buffer((uint8_t *)&daq_buffer[start_i], DAQ_BUFFER_LEN - start_i);
+                    VCP_send_buffer((uint8_t *)daq_buffer, (params->sample_count / 2) - 
+                            (DAQ_BUFFER_LEN - start_i));
+                }
+                reset();
+                break;
+            case COMMAND_INFO:
+                VCP_send_str("Version 0.1a");
         }
-        reset();
     }
 
     return 0;

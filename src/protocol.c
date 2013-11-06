@@ -13,6 +13,7 @@ uint8_t    Protocol_ProcessNewPacket(void)
     
     switch (protocol_rx_buffer[0]) {
         case COMMAND_ACQUIRE:
+            session_params.command = COMMAND_ACQUIRE;
             session_params.sample_period = (*(uint16_t*)ptr);
             ptr += 2;
             session_params.sample_count = (*(uint16_t*)ptr);

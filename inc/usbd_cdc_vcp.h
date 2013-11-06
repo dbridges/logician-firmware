@@ -52,7 +52,7 @@ typedef struct
 #endif /* USE_STM322xG_EVAL */
 
 void VCP_put_char(uint8_t buf);
-void VCP_send_str(uint8_t* buf);
+void VCP_send_str(char* buf);
 int VCP_data_available(void);
 int VCP_get_char(uint8_t *buf);
 int VCP_get_buffer(uint8_t *buf, int len);

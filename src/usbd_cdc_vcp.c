@@ -147,12 +147,12 @@ void VCP_put_char(uint8_t buf) {
 	VCP_DataTx(&buf, 1);
 }
 
-void VCP_send_str(uint8_t* buf) {
+void VCP_send_str(char* buf) {
 	uint32_t i = 0;
 	while (*(buf + i)) {
 		i++;
 	}
-	VCP_DataTx(buf, i);
+	VCP_DataTx((uint8_t *)buf, i);
 }
 
 void VCP_send_buffer(uint8_t* buf, int len) {
