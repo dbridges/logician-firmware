@@ -55,9 +55,9 @@ void VCP_put_char(uint8_t buf);
 void VCP_send_str(char* buf);
 int VCP_data_available(void);
 int VCP_get_char(uint8_t *buf);
-int VCP_get_buffer(uint8_t *buf, int len);
+int VCP_get_buffer(uint8_t *buf, uint32_t len);
 int VCP_get_string(uint8_t *buf);
-void VCP_send_buffer(uint8_t* buf, int len);
+void VCP_send_buffer(uint8_t *buf, uint32_t len);
 void VCP_flush_rx(void);
 
 #define DEFAULT_CONFIG                  0

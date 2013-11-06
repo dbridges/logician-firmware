@@ -45,6 +45,7 @@ extern uint8_t APP_Rx_Buffer[]; /* Write CDC received data in this buffer.
 extern uint32_t APP_Rx_ptr_in; /* Increment this pointer or roll it back to
  start address when writing received data
  in the buffer APP_Rx_Buffer. */
+extern uint32_t APP_Rx_length;
 
 /* Private function prototypes -----------------------------------------------*/
 static uint16_t VCP_Init(void);
@@ -155,8 +156,19 @@ void VCP_send_str(char* buf) {
 	VCP_DataTx((uint8_t *)buf, i);
 }
 
-void VCP_send_buffer(uint8_t* buf, int len) {
-	VCP_DataTx(buf, len);
+void VCP_send_buffer(uint8_t *buf, uint32_t len) {
+    if (len < APP_RX_DATA_SIZE) {
+        VCP_DataTx(buf, len);
+    } else {
+        // Data is too large, we need to send data in multiple packets.
+        uint32_t i;
+        for (i = 0; i < (len / APP_RX_DATA_SIZE); i++) {
+            VCP_DataTx(buf + (i * APP_RX_DATA_SIZE), APP_RX_DATA_SIZE);
+            while(APP_Rx_length);   // Wait for data to be sent.
+        }
+        // Send the remaining data.
+        VCP_DataTx(buf + (i * APP_RX_DATA_SIZE), len % APP_RX_DATA_SIZE);
+    }
 }
 
 /**
@@ -240,11 +252,11 @@ int VCP_get_char(uint8_t *buf) {
 	return 1;
 }
 
-int VCP_get_buffer(uint8_t *buf, int len) {
+int VCP_get_buffer(uint8_t *buf, uint32_t len) {
 	if (APP_tx_ptr_head == APP_tx_ptr_tail)
 		return 0;
 
-    for (int i = 0; i < len; i++) {
+    for (uint32_t i = 0; i < len; i++) {
         *buf = APP_Tx_Buffer[APP_tx_ptr_tail];
         buf++;
         APP_tx_ptr_tail++;
