@@ -16,7 +16,7 @@
 __ALIGN_BEGIN USB_OTG_CORE_HANDLE  USB_OTG_dev __ALIGN_END;
 
 #define DAQ_PORT            GPIOD
-#define DAQ_BUFFER_LEN      10000 
+#define DAQ_BUFFER_LEN      100000 
 #define DAQ_TRIGGER_OFFSET  20          // Number of samples before 
                                         // trigger to keep
 
@@ -26,10 +26,6 @@ typedef enum {
 } trigger_t;
 
 extern uint8_t protocol_rx_buffer[64];
-
-volatile unsigned int *DWT_CYCCNT  = (volatile unsigned int *)0xE0001004;
-volatile unsigned int *DWT_CONTROL = (volatile unsigned int *)0xE0001000;
-volatile unsigned int *SCB_DEMCR   = (volatile unsigned int *)0xE000EDFC;
 
 volatile uint32_t sample_count;
 volatile uint8_t aq_byte;
@@ -202,7 +198,7 @@ int main(void)
         params = Protocol_SessionParams();
         switch (params->command) {
             case COMMAND_ACQUIRE:
-                sample_count = params->sample_count - (DAQ_TRIGGER_OFFSET / 2);
+                sample_count = params->sample_count - (DAQ_TRIGGER_OFFSET);
                 trigger_type = params->trigger_type;
                 trigger_channel = params->trigger_channel;
                 prev_sample = ((uint8_t)DAQ_PORT->IDR) & 0x0F;

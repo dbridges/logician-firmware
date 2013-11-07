@@ -1,4 +1,4 @@
 target remote localhost:3333
 monitor reset halt
 load
-break main.c:216
+break usbd_cdc_vcp.c:170

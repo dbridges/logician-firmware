@@ -45,7 +45,9 @@ extern uint8_t APP_Rx_Buffer[]; /* Write CDC received data in this buffer.
 extern uint32_t APP_Rx_ptr_in; /* Increment this pointer or roll it back to
  start address when writing received data
  in the buffer APP_Rx_Buffer. */
+extern uint32_t APP_Rx_ptr_out;
 extern uint32_t APP_Rx_length;
+uint8_t  USB_Tx_State;
 
 /* Private function prototypes -----------------------------------------------*/
 static uint16_t VCP_Init(void);
@@ -162,12 +164,16 @@ void VCP_send_buffer(uint8_t *buf, uint32_t len) {
     } else {
         // Data is too large, we need to send data in multiple packets.
         uint32_t i;
-        for (i = 0; i < (len / APP_RX_DATA_SIZE); i++) {
-            VCP_DataTx(buf + (i * APP_RX_DATA_SIZE), APP_RX_DATA_SIZE);
-            while(APP_Rx_length);   // Wait for data to be sent.
+        for (i = 0; i < (len / (APP_RX_DATA_SIZE - 1)); i++) {
+            VCP_DataTx(buf + (i * (APP_RX_DATA_SIZE - 1)), (APP_RX_DATA_SIZE - 1));
+            /*while (!USB_Tx_State);*/
+            /*while (USB_Tx_State);*/
+            for (int j = 0; j < 1000000; j++) {
+                asm("nop");
+            }
         }
         // Send the remaining data.
-        VCP_DataTx(buf + (i * APP_RX_DATA_SIZE), len % APP_RX_DATA_SIZE);
+        VCP_DataTx(buf + (i * (APP_RX_DATA_SIZE - 1)), len % (APP_RX_DATA_SIZE - 1));
     }
 }
 
