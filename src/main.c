@@ -203,14 +203,17 @@ int main(void)
                 trigger_channel = params->trigger_channel;
                 prev_sample = ((uint8_t)DAQ_PORT->IDR) & 0x0F;
                 TIM2_Enable();
-                while (sample_count > 0);
+                while (sample_count > 0);  // Wait for trigger and acquisition.
                 TIM2_Disable();
                 if ((DAQ_BUFFER_LEN - start_i) > params->sample_count / 2) {
-                    VCP_send_buffer((uint8_t *)&daq_buffer[start_i], daq_i - start_i);
+                    VCP_send_buffer((uint8_t *)&daq_buffer[start_i],
+                            daq_i - start_i);
                 } else {
-                    VCP_send_buffer((uint8_t *)&daq_buffer[start_i], DAQ_BUFFER_LEN - start_i);
-                    VCP_send_buffer((uint8_t *)daq_buffer, (params->sample_count / 2) - 
-                            (DAQ_BUFFER_LEN - start_i));
+                    VCP_send_buffer((uint8_t *)&daq_buffer[start_i],
+                            DAQ_BUFFER_LEN - start_i);
+                    VCP_send_buffer((uint8_t *)daq_buffer, 
+                            (params->sample_count / 2) - 
+                                (DAQ_BUFFER_LEN - start_i));
                 }
                 reset_acquistion();
                 break;
