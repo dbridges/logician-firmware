@@ -15,11 +15,11 @@
 
 __ALIGN_BEGIN USB_OTG_CORE_HANDLE  USB_OTG_dev __ALIGN_END;
 
-#define DAQ_PORT            GPIOD
-#define DAQ_BUFFER_LEN      100000 
-#define DAQ_TRIGGER_OFFSET  20          // Number of samples before 
-                                        // trigger to keep
-
+#define DAQ_PORT                GPIOD
+#define DAQ_BUFFER_LEN          50000
+#define DAQ_TRIGGER_TIMEOUT     10000000
+#define DAQ_TRIGGER_OFFSET      200  // Number of samples before
+                                    // trigger to keep
 typedef enum {
     TRIGGER_RISING,
     TRIGGER_FALLING
@@ -37,6 +37,7 @@ volatile uint8_t triggered = FALSE;
 volatile uint8_t trigger_type;
 volatile uint8_t trigger_channel;
 volatile uint8_t prev_sample;
+volatile uint32_t timeout;
 
 
 static void gpio_init(void)
@@ -47,8 +48,7 @@ static void gpio_init(void)
     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_3;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IN;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_DOWN;
+    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_UP;
     GPIO_Init(DAQ_PORT, &GPIO_InitStructure);
 }
 
@@ -81,7 +81,7 @@ static void TIM2_Config(void)
     TIM_TimeBaseStructure.TIM_Prescaler = 1;
     TIM_TimeBaseStructure.TIM_Period = 83;
     TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up; 
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
     // TIM2 TRGO selection
@@ -154,10 +154,17 @@ void TIM2_IRQHandler(void)
         if (triggered) {
             // Trigger was just satisified, store the index to the array where
             // it occurred for use later when transfering data.
+            LED_Reset(LED_ALL);
+            LED_Set(LED_RED);
             if (daq_i > DAQ_TRIGGER_OFFSET)
                 start_i = daq_i - DAQ_TRIGGER_OFFSET;
             else {
                 start_i = DAQ_BUFFER_LEN - (DAQ_TRIGGER_OFFSET - daq_i);
+            }
+        } else {
+            timeout--;
+            if (timeout == 0) {
+                sample_count = 0;
             }
         }
     }
@@ -167,7 +174,12 @@ void TIM2_IRQHandler(void)
 void reset_acquistion(void)
 {
     daq_i = 0;
+    start_i = 0;
     triggered = FALSE;
+    aq_flag = 1;
+    timeout = DAQ_TRIGGER_TIMEOUT;
+    LED_Reset(LED_ALL);
+    LED_Set(LED_GREEN);
 }
 
 uint8_t check_usb(void)
@@ -198,28 +210,33 @@ int main(void)
         params = Protocol_SessionParams();
         switch (params->command) {
             case COMMAND_ACQUIRE:
-                sample_count = params->sample_count - (DAQ_TRIGGER_OFFSET);
+                sample_count = params->sample_count -
+                    (DAQ_TRIGGER_OFFSET);
                 trigger_type = params->trigger_type;
                 trigger_channel = params->trigger_channel;
-                prev_sample = ((uint8_t)DAQ_PORT->IDR) & 0x0F;
+                prev_sample = (uint8_t)DAQ_PORT->IDR;
+                LED_Reset(LED_ALL);
+                LED_Set(LED_ORANGE);
                 TIM2_Enable();
                 while (sample_count > 0);  // Wait for trigger and acquisition.
                 TIM2_Disable();
+                LED_Reset(LED_ALL);
                 if ((DAQ_BUFFER_LEN - start_i) > params->sample_count / 2) {
                     VCP_send_buffer((uint8_t *)&daq_buffer[start_i],
                             daq_i - start_i);
                 } else {
+                    LED_Set(LED_BLUE);
                     VCP_send_buffer((uint8_t *)&daq_buffer[start_i],
                             DAQ_BUFFER_LEN - start_i);
-                    VCP_send_buffer((uint8_t *)daq_buffer, 
-                            (params->sample_count / 2) - 
+                    VCP_send_buffer((uint8_t *)daq_buffer,
+                            (params->sample_count / 2) -
                                 (DAQ_BUFFER_LEN - start_i));
                 }
-                reset_acquistion();
                 break;
             case COMMAND_INFO:
                 VCP_send_str("Version 0.1a\n");
         }
+        reset_acquistion();
     }
 
     return 0;

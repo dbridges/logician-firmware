@@ -16,7 +16,7 @@ uint8_t    Protocol_ProcessNewPacket(void)
             session_params.command = COMMAND_ACQUIRE;
             session_params.sample_period = (*(uint16_t*)ptr);
             ptr += 2;
-            session_params.sample_count = (*(uint16_t*)ptr);
+            session_params.sample_count = 1000L*(*(uint16_t*)ptr);
             ptr += 2;
             session_params.trigger_type = (*(uint8_t*)ptr);
             ptr += 1;

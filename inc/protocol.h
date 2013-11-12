@@ -13,7 +13,7 @@ typedef enum {
 typedef struct {
     command_t  command;            /* Command */
     uint16_t   sample_period;      /* In us. */
-    uint16_t   sample_count;       /* Number of samples to acquire. */
+    uint32_t   sample_count;       /* Number of samples to acquire. */
     uint8_t    trigger_type;       /* rising = 0, falling = 1 */
     uint8_t    trigger_channel;    /* 0-4 */
 } session_param_t;
